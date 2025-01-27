@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chia Tiền</title>
+    <script>
+        function calculateSplit() {
+            const rows = document.querySelectorAll('.expense-row');
+            let total = 0;
+            const contributions = {};
+
+            rows.forEach(row => {
+                const name = row.querySelector('.name').value.trim();
+                const amount = parseFloat(row.querySelector('.amount').value.trim());
+
+                if (name && !isNaN(amount)) {
+                    contributions[name] = (contributions[name] || 0) + amount;
+                    total += amount;
+                }
+            });
+
+            const numPeople = Object.keys(contributions).length;
+            if (numPeople === 0) {
+                document.getElementById('result').textContent = "Vui lòng nhập dữ liệu hợp lệ.";
+                return;
+            }
+
+            let average = total / numPeople;
+            average = Math.round(average);
+            const balances = {};
+
+            for (const [name, amount] of Object.entries(contributions)) {
+                balances[name] = amount - average;
+            }
+
+            const payments = [];
+
+            const creditors = Object.entries(balances)
+                .filter(([_, balance]) => balance > 0)
+                .map(([name, balance]) => ({ name, balance }));
+            const debtors = Object.entries(balances)
+                .filter(([_, balance]) => balance < 0)
+                .map(([name, balance]) => ({ name, balance: -balance }));
+
+            for (let debtor of debtors) {
+                while (debtor.balance > 0 && creditors.length > 0) {
+                    const creditor = creditors[0];
+                    const payment = Math.min(creditor.balance, debtor.balance);
+
+                    payments.push(`${debtor.name} chuyển cho ${creditor.name} ${payment.toFixed(0)}k`);
+
+                    debtor.balance -= payment;
+                    creditor.balance -= payment;
+
+                    if (creditor.balance.toFixed(2) === '0.00') creditors.shift();
+                }
+            }
+
+            const result = payments.length > 0 ? payments.join('\n') : "Không cần thanh toán! Mọi người đã cân bằng.";
+            document.getElementById('result').textContent = `Trung bình mỗi người: ${average}K\n\n${result}`;
+        }
+
+        function addRow() {
+            const container = document.getElementById('expenses-container');
+            const row = document.createElement('div');
+            row.className = 'expense-row';
+            row.innerHTML = `
+                <input type="text" class="name" placeholder="Tên" />
+                <input type="number" class="amount" placeholder="Số tiền đã chi" />
+                <button type="button" class="remove-button" onclick="removeRow(this)">Xóa</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeRow(button) {
+            button.parentElement.remove();
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: #4caf50;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+
+        #expenses-container {
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            p {
+                font-size: 1rem;
+            }
+
+            #expenses-container {
+                max-width: 100%;
+            }
+
+            .expense-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .expense-row input {
+                margin-bottom: 10px;
+            }
+        }
+
+        .expense-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .expense-row input {
+            padding: 10px;
+            font-size: 1rem;
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .remove-button {
+            background-color: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .remove-button:hover {
+            background-color: #ff1a1a;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        #add-row-button {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        #add-row-button:hover {
+            background-color: #45a049;
+        }
+
+        #calculate-button {
+            background-color: #008cba;
+            color: white;
+        }
+
+        #calculate-button:hover {
+            background-color: #007bb5;
+        }
+
+        #result {
+            white-space: pre-wrap;
+            background: #ffffff;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>Tính tiền trọ</h1>
+    <p>Nhập tên và số tiền đã chi của từng người bên dưới.</p>
+    <div id="expenses-container"></div>
+    <button id="add-row-button" onclick="addRow()">Thêm Người</button>
+    <button id="calculate-button" onclick="calculateSplit()">Tính Toán</button>
+    <div id="result"></div>
+</body>
+</html>
