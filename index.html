@@ -9,13 +9,23 @@
             const rows = document.querySelectorAll('.expense-row');
             let total = 0;
             const contributions = {};
+            const details = {};
 
             rows.forEach(row => {
                 const name = row.querySelector('.name').value.trim();
                 const amount = parseFloat(row.querySelector('.amount').value.trim());
+                const note = row.querySelector('.note').value.trim();
 
                 if (name && !isNaN(amount)) {
-                    contributions[name] = (contributions[name] || 0) + amount;
+                    if (!contributions[name]) {
+                        contributions[name] = 0;
+                        details[name] = [];
+                    }
+                    contributions[name] += amount;
+                    details[name].push({
+                        amount: amount,
+                        note: note || 'Không có ghi chú'
+                    });
                     total += amount;
                 }
             });
@@ -28,37 +38,70 @@
 
             let average = total / numPeople;
             average = Math.round(average);
+            
+            // Tính toán số tiền chênh lệch
             const balances = {};
-
             for (const [name, amount] of Object.entries(contributions)) {
                 balances[name] = amount - average;
             }
 
-            const payments = [];
+            // Tạo báo cáo chi tiết với HTML formatting
+            let report = '<div class="section-title">CHI TIẾT CHI TIÊU:</div>\n\n';
+            
+            for (const [name, expenses] of Object.entries(details)) {
+                report += `<div class="person-details">${name}:\n`;
+                expenses.forEach(expense => {
+                    report += `<div class="expense-detail">- ${expense.amount}k (${expense.note})</div>\n`;
+                });
+                report += `<strong>Tổng: ${contributions[name]}k</strong></div>\n\n`;
+            }
+            
+            report += `<div class="total-section">Tổng cộng: ${total}k\nTrung bình mỗi người: ${average}k</div>\n\n`;
 
-            const creditors = Object.entries(balances)
-                .filter(([_, balance]) => balance > 0)
-                .map(([name, balance]) => ({ name, balance }));
-            const debtors = Object.entries(balances)
-                .filter(([_, balance]) => balance < 0)
-                .map(([name, balance]) => ({ name, balance: -balance }));
+            report += '<div class="section-title">CHUYỂN TIỀN:</div>\n';
+            report += '<div class="transfer-section">';
 
-            for (let debtor of debtors) {
-                while (debtor.balance > 0 && creditors.length > 0) {
-                    const creditor = creditors[0];
-                    const payment = Math.min(creditor.balance, debtor.balance);
-
-                    payments.push(`${debtor.name} chuyển cho ${creditor.name} ${payment.toFixed(0)}k`);
-
-                    debtor.balance -= payment;
-                    creditor.balance -= payment;
-
-                    if (creditor.balance.toFixed(2) === '0.00') creditors.shift();
+            // Tạo danh sách người cần nhận và người cần trả
+            const creditors = [];
+            const debtors = [];
+            
+            for (const [name, balance] of Object.entries(balances)) {
+                if (balance > 0) {
+                    creditors.push({ name, amount: balance });
+                } else if (balance < 0) {
+                    debtors.push({ name, amount: -balance });
                 }
             }
 
-            const result = payments.length > 0 ? payments.join('\n') : "Không cần thanh toán! Mọi người đã cân bằng.";
-            document.getElementById('result').textContent = `Trung bình mỗi người: ${average}K\n\n${result}`;
+            // Sắp xếp theo số tiền giảm dần
+            creditors.sort((a, b) => b.amount - a.amount);
+            debtors.sort((a, b) => b.amount - a.amount);
+
+            const payments = [];
+            let i = 0, j = 0;
+
+            while (i < debtors.length && j < creditors.length) {
+                const debtor = debtors[i];
+                const creditor = creditors[j];
+                
+                const amount = Math.min(debtor.amount, creditor.amount);
+                if (amount > 0) {
+                    payments.push(
+                        `<div class="transfer-item">${debtor.name} chuyển cho ${creditor.name} ${Math.round(amount)}k</div>`
+                    );
+                }
+
+                debtor.amount -= amount;
+                creditor.amount -= amount;
+
+                if (debtor.amount < 1) i++;
+                if (creditor.amount < 1) j++;
+            }
+
+            report += payments.length > 0 ? payments.join('\n') : "Không cần thanh toán! Mọi người đã cân bằng.";
+            report += '</div>';
+            
+            document.getElementById('result').innerHTML = report;
         }
 
         function addRow() {
@@ -68,6 +111,7 @@
             row.innerHTML = `
                 <input type="text" class="name" placeholder="Tên" />
                 <input type="number" class="amount" placeholder="Số tiền đã chi" />
+                <input type="text" class="note" placeholder="Ghi chú" />
                 <button type="button" class="remove-button" onclick="removeRow(this)">Xóa</button>
             `;
             container.appendChild(row);
@@ -150,6 +194,10 @@
             border-radius: 5px;
         }
 
+        .expense-row input.note {
+            flex: 2;
+        }
+
         .remove-button {
             background-color: #ff4d4d;
             color: white;
@@ -194,18 +242,62 @@
         #result {
             white-space: pre-wrap;
             background: #ffffff;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
             margin-top: 20px;
             width: 100%;
             max-width: 600px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            font-family: 'Courier New', monospace;
+            line-height: 1.2;
+        }
+
+        .section-title {
+            color: #2196F3;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin: -15px 0;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #2196F3;
+        }
+
+        .person-details {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            margin: -15px 0;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .expense-detail {
+            padding-left: 20px;
+            color: #555;
+        }
+
+        .total-section {
+            background: #e3f2fd;
+            padding: 10px 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .transfer-section {
+            background: #e3f2fd;
+            padding: 10px 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .transfer-item {
+            padding: 5px 0;
+            color: #030303;
         }
     </style>
 </head>
 <body>
-    <h1>Chia tiền</h1>
+    <h1>Tính tiền trọ</h1>
     <p>Nhập tên và số tiền đã chi của từng người bên dưới.</p>
     <div id="expenses-container"></div>
     <button id="add-row-button" onclick="addRow()">Thêm Người</button>
